@@ -41,7 +41,7 @@ func Run() {
 	resultT, resultSetT := controller.Result()
 	fmt.Println("Result:", resultT, "ResultSetT:", resultSetT)
 
-	resultSmsSort := controller.GetResultData(resultSms)
+	resultSmsSort := controller.GetResultData(resultSms, resultMms, resultVoiceCall, resultEmail)
 	fmt.Println("resultSmsSort", resultSmsSort)
 
 	router := mux.NewRouter()

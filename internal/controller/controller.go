@@ -472,10 +472,14 @@ func Result() ([]byte, []byte) {
 	return dResultT, dResultSetT
 }
 
-func GetResultData(sms []SMSData) ResultSetT {
-	var resultSetT ResultSetT
-	var finalSmsData []SMSData
-	var smsSort [][]SMSData
+func GetResultData(sms []SMSData, mms []MMSData, VoiceCall []VoiceCallData, resultEmail []EmailData) ResultSetT {
+	var (
+		resultSetT   ResultSetT
+		finalSmsData []SMSData
+		smsSort      [][]SMSData
+		mmsSort      [][]MMSData
+		finalMmsData []MMSData
+	)
 	for _, smsD := range sms {
 		country, _ := checkCountry(smsD.Country)
 		smsD.Country = country
@@ -490,8 +494,47 @@ func GetResultData(sms []SMSData) ResultSetT {
 		return finalSmsData[i].Provider < finalSmsData[j].Provider
 	})
 	finalSmsDataByProvider := finalSmsData
-	smsSort = [][]SMSData{finalSmsDataByCountry, finalSmsDataByProvider}
+	smsSort = [][]SMSData{finalSmsDataByProvider, finalSmsDataByCountry}
 	resultSetT.SMS = smsSort
+
+	for _, mmsD := range mms {
+		country, _ := checkCountry(mmsD.Country)
+		mmsD.Country = country
+		finalMmsData = append(finalMmsData, mmsD)
+	}
+	sort.Slice(finalMmsData, func(i, j int) bool {
+		return finalMmsData[i].Country < finalMmsData[j].Country
+	})
+	var finalMmsDataByCountry []MMSData
+	finalMmsDataByCountry = append(finalMmsDataByCountry, finalMmsData...)
+	sort.Slice(finalMmsData, func(i, j int) bool {
+		return finalMmsData[i].Provider < finalMmsData[j].Provider
+	})
+	finalMmsDataByProvider := finalMmsData
+	mmsSort = [][]MMSData{finalMmsDataByProvider, finalMmsDataByCountry}
+	resultSetT.MMS = mmsSort
+
+	resultSetT.VoiceCall = VoiceCall
+
+	var emailMap  map[string][]EmailData
+	var KeyCountry string
+	var slowProv []EmailData
+	for _,email := range resultEmail {
+		var e EmailData
+
+		KeyCountry = email.Country
+		for email.Country == KeyCountry {
+			if email.DeliveryTime > e.DeliveryTime {
+				slowProv = append(slowProv, email)
+			}
+			emailMap[keyCountry]=
+		}
+
+	}
+
+	sort.Slice(resultEmail, func(i, j int) bool {
+		return resultEmail[i].Country < resultEmail[j].Country
+	})
 	return resultSetT
 }
 
