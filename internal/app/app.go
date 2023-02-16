@@ -10,7 +10,15 @@ import (
 
 func Run() {
 	router := mux.NewRouter()
-	router.HandleFunc("/", controller.HandleConnection)
+	router.HandleFunc("/api", controller.HandleConnection)
+
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/")))
+	http.Handle("/", router)
+	/*
+		fileServer := http.FileServer(http.Dir("./web/"))
+		router.Handle("/", http.NotFoundHandler())
+		router.Handle("/", http.StripPrefix("/", fileServer))
+	*/
 	server := &http.Server{
 		Addr:    ":8282",
 		Handler: router,

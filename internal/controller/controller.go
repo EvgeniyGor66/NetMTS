@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 )
 
 type SMSData struct {
+	//sync.Mutex
 	Country      string `json:"country"`
 	Bandwidth    string `json:"bandwidth"`
 	ResponseTime string `json:"response_time"`
@@ -78,12 +78,19 @@ type ResultSetT struct {
 }
 
 const (
-	prov1 string = "Topolo"
-	prov2 string = "Rond"
-	prov3 string = "Kildy"
-	prov4 string = "TransparentCalls"
-	prov5 string = "E-Voice"
-	prov6 string = "JustPhone"
+	smsUri             = "simulator/sms.data"
+	mmsUri             = "http://localhost:8383/mms"
+	voiceUri           = "simulator/voice.data"
+	emailUri           = "simulator/email.data"
+	billingUri         = "simulator/billing.data"
+	supportUri         = "http://localhost:8383/support"
+	incidentUri        = "http://localhost:8383/accendent"
+	prov1       string = "Topolo"
+	prov2       string = "Rond"
+	prov3       string = "Kildy"
+	prov4       string = "TransparentCalls"
+	prov5       string = "E-Voice"
+	prov6       string = "JustPhone"
 )
 
 var emailProv = [...]string{
@@ -104,16 +111,18 @@ var emailProv = [...]string{
 
 func GetDataSms(c SMSData) ([]SMSData, error) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
-
+	//c.Lock()
+	//defer c.Unlock()
 	var finalSmsData []SMSData
 	var stringsData []string
 
-	fContent, err := os.ReadFile("web/sms.data")
+	fContent, err := os.ReadFile(smsUri)
 	if err != nil {
 		errorLog.Println(err)
 		return finalSmsData, err
 	}
 
+	//go func() {
 	stringsData = strings.Split(string(fContent), "\n")
 
 	for _, stringData := range stringsData { //разбиваем построчно
@@ -122,13 +131,14 @@ func GetDataSms(c SMSData) ([]SMSData, error) {
 			continue
 		}
 		correctData := validation(str)
+
 		c.Country = correctData[0]
 		c.Bandwidth = correctData[1]
 		c.ResponseTime = correctData[2]
 		c.Provider = correctData[3]
 		finalSmsData = append(finalSmsData, c)
 	}
-
+	//}()
 	return finalSmsData, nil
 }
 
@@ -136,7 +146,7 @@ func GetMms() ([]MMSData, error) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 	correctMms := []MMSData{}
 	Mms := []MMSData{}
-	r, err := http.Get("http://localhost:8383/mms")
+	r, err := http.Get(mmsUri)
 	if err != nil {
 		log.Fatal(err)
 		return Mms, err
@@ -154,6 +164,7 @@ func GetMms() ([]MMSData, error) {
 		return Mms, err
 	}
 
+	//go func() {
 	for _, field := range Mms {
 		correctData := MMSData{}
 		countryCode := field.Country
@@ -183,7 +194,7 @@ func GetMms() ([]MMSData, error) {
 		}
 		correctMms = append(correctMms, correctData)
 	}
-
+	//}()
 	return correctMms, nil
 }
 
@@ -193,12 +204,13 @@ func GetDataVoiceCall(c VoiceCallData) ([]VoiceCallData, error) {
 	var finalVoiceCallData []VoiceCallData
 	var stringsData []string
 
-	fContent, err := os.ReadFile("web/voice.data")
+	fContent, err := os.ReadFile(voiceUri)
 	if err != nil {
 		errorLog.Println(err)
 		return finalVoiceCallData, err
 	}
 
+	//go func() {
 	stringsData = strings.Split(string(fContent), "\n")
 
 	for _, stringData := range stringsData { //разбиваем построчно
@@ -218,7 +230,7 @@ func GetDataVoiceCall(c VoiceCallData) ([]VoiceCallData, error) {
 		c.MedianOfCallsTime, _ = strconv.Atoi(correctData[7])
 		finalVoiceCallData = append(finalVoiceCallData, c)
 	}
-
+	//}()
 	return finalVoiceCallData, nil
 }
 
@@ -228,12 +240,13 @@ func GetDataEmail(c EmailData) ([]EmailData, error) {
 	var finalEmailData []EmailData
 	var stringsData []string
 
-	fContent, err := os.ReadFile("web/email.data")
+	fContent, err := os.ReadFile(emailUri)
 	if err != nil {
 		errorLog.Println(err)
 		return finalEmailData, err
 	}
 
+	//go func() {
 	stringsData = strings.Split(string(fContent), "\n")
 
 	for _, stringData := range stringsData { //разбиваем построчно
@@ -284,6 +297,7 @@ func GetDataEmail(c EmailData) ([]EmailData, error) {
 			finalEmailData = append(finalEmailData, c)
 		}
 	}
+	//}()
 	return finalEmailData, nil
 }
 
@@ -293,12 +307,13 @@ func GetDataBilling() (BillingData, error) {
 	reversBilling := []byte{0, 0, 0, 0, 0, 0}
 	var billingBool []bool
 
-	fContent, err := os.ReadFile("web/billing.data")
+	fContent, err := os.ReadFile(billingUri)
 	if err != nil {
 		errorLog.Println(err)
 		return Billing, err
 	}
 
+	//go func() {
 	for i, b := range fContent {
 		reversBilling[(len(fContent)-1)-i] = b
 	}
@@ -317,13 +332,14 @@ func GetDataBilling() (BillingData, error) {
 	Billing.Recurring = billingBool[3]
 	Billing.FraudControl = billingBool[4]
 	Billing.CheckoutPage = billingBool[5]
+	//}()
 	return Billing, nil
 }
 
 func GetSupport(c SupportData) ([]SupportData, error) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 	Support := []SupportData{}
-	r, err := http.Get("http://localhost:8383/support")
+	r, err := http.Get(supportUri)
 	if err != nil {
 		log.Fatal(err)
 		return Support, err
@@ -347,7 +363,7 @@ func GetSupport(c SupportData) ([]SupportData, error) {
 func GetIncident(c IncidentData) ([]IncidentData, error) {
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 	Incident := []IncidentData{}
-	r, err := http.Get("http://localhost:8383/accendent")
+	r, err := http.Get(incidentUri)
 	if err != nil {
 		log.Fatal(err)
 		return Incident, err
@@ -460,57 +476,58 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	var EmailData EmailData
 	var SupportData SupportData
 	var IncidentData IncidentData
+
 	result.Status = true
 	resultSms, err := GetDataSms(smsData)
 	if err != nil {
 		result.Status = false
 		result.Error = "Error on collect data"
 	}
-	fmt.Println("resultSms", resultSms)
+	log.Println("resultSms", resultSms)
 
 	resultMms, err := GetMms()
 	if err != nil {
 		result.Status = false
 		result.Error = "Error on collect data"
 	}
-	fmt.Printf("resultMms: %s \n", resultMms)
+	log.Printf("resultMms: %s \n", resultMms)
 
 	resultVoiceCall, err := GetDataVoiceCall(VoiceCallData)
 	if err != nil {
 		result.Status = false
 		result.Error = "Error on collect data"
 	}
-	fmt.Println("resultVoiceCall", resultVoiceCall)
+	log.Println("resultVoiceCall", resultVoiceCall)
 
 	resultEmail, err := GetDataEmail(EmailData)
 	if err != nil {
 		result.Status = false
 		result.Error = "Error on collect data"
 	}
-	fmt.Println("resultEmail", resultEmail)
+	log.Println("resultEmail", resultEmail)
 
 	resultBilling, err := GetDataBilling()
 	if err != nil {
 		result.Status = false
 		result.Error = "Error on collect data"
 	}
-	fmt.Println("resultBilling", resultBilling)
+	log.Println("resultBilling", resultBilling)
 
 	resultSupport, err := GetSupport(SupportData)
 	if err != nil {
 		result.Status = false
 		result.Error = "Error on collect data"
 	}
-	fmt.Println("resultSupport", resultSupport)
+	log.Println("resultSupport", resultSupport)
 
 	resultIncident, err := GetIncident(IncidentData)
 	if err != nil {
 		result.Status = false
 		result.Error = "Error on collect data"
 	}
-	fmt.Println("resultIncident", resultIncident)
+	log.Println("resultIncident", resultIncident)
 	resultData := GetResultData(resultSms, resultMms, resultVoiceCall, resultEmail, resultBilling, resultSupport, resultIncident)
-	fmt.Println("resultData", resultData)
+	log.Println("resultData", resultData)
 	result.Data = resultData
 	dResultT, err := json.Marshal(result)
 	if err != nil {
