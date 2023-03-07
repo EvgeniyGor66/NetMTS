@@ -14,11 +14,7 @@ func Run() {
 
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./web/")))
 	http.Handle("/", router)
-	/*
-		fileServer := http.FileServer(http.Dir("./web/"))
-		router.Handle("/", http.NotFoundHandler())
-		router.Handle("/", http.StripPrefix("/", fileServer))
-	*/
+
 	server := &http.Server{
 		Addr:    ":8282",
 		Handler: router,
