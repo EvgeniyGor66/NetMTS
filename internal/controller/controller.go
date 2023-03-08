@@ -535,18 +535,19 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errorLog.Fatal(err)
 	}
-
 	w.WriteHeader(http.StatusOK)
 	w.Write(dResultT)
 }
 
 func GetResultData(sms []SMSData, mms []MMSData, VoiceCall []VoiceCallData, resultEmail []EmailData, resultBilling BillingData, resultSupport []SupportData, Incidents []IncidentData) ResultSetT {
 	var (
-		resultSetT   ResultSetT
-		finalSmsData []SMSData
-		smsSort      [][]SMSData
-		mmsSort      [][]MMSData
-		finalMmsData []MMSData
+		resultSetT            ResultSetT
+		finalSmsData          []SMSData
+		smsSort               [][]SMSData
+		mmsSort               [][]MMSData
+		finalMmsData          []MMSData
+		finalSmsDataByCountry []SMSData
+		finalMmsDataByCountry []MMSData
 	)
 	for _, smsD := range sms {
 		country, _ := checkCountry(smsD.Country)
@@ -556,7 +557,7 @@ func GetResultData(sms []SMSData, mms []MMSData, VoiceCall []VoiceCallData, resu
 	sort.Slice(finalSmsData, func(i, j int) bool {
 		return finalSmsData[i].Country < finalSmsData[j].Country
 	})
-	var finalSmsDataByCountry []SMSData
+
 	finalSmsDataByCountry = append(finalSmsDataByCountry, finalSmsData...)
 	sort.Slice(finalSmsData, func(i, j int) bool {
 		return finalSmsData[i].Provider < finalSmsData[j].Provider
@@ -573,7 +574,7 @@ func GetResultData(sms []SMSData, mms []MMSData, VoiceCall []VoiceCallData, resu
 	sort.Slice(finalMmsData, func(i, j int) bool {
 		return finalMmsData[i].Country < finalMmsData[j].Country
 	})
-	var finalMmsDataByCountry []MMSData
+
 	finalMmsDataByCountry = append(finalMmsDataByCountry, finalMmsData...)
 	sort.Slice(finalMmsData, func(i, j int) bool {
 		return finalMmsData[i].Provider < finalMmsData[j].Provider
