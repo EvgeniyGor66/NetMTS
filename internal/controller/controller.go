@@ -119,6 +119,9 @@ func GetDataSms(chSms chan []SMSData, chError chan error) {
 		errorLog.Println(err)
 		chError <- err
 		chSms <- finalSmsData
+	} else {
+		chError <- nil
+		log.Println("Sms")
 	}
 
 	stringsData = strings.Split(string(fContent), "\n")
@@ -137,9 +140,9 @@ func GetDataSms(chSms chan []SMSData, chError chan error) {
 		finalSmsData = append(finalSmsData, smsData)
 
 	}
-
-	chError <- nil
-
+	///////////////////////////////////////////////////////////////////
+	//chError <- nil
+	//////////////////////////////////////////////////////////////////
 	chSms <- finalSmsData
 }
 
@@ -208,6 +211,9 @@ func GetDataVoiceCall(chVoice chan []VoiceCallData, chError chan error) {
 		errorLog.Println(err)
 		chError <- err
 		chVoice <- finalVoiceCallData
+	} else {
+		chError <- nil
+		log.Println("Voice")
 	}
 
 	stringsData = strings.Split(string(fContent), "\n")
@@ -244,6 +250,9 @@ func GetDataEmail(chEmail chan []EmailData, chError chan error) {
 		errorLog.Println(err)
 		chError <- err
 		chEmail <- finalEmailData
+	} else {
+		chError <- nil
+		log.Println("Email")
 	}
 
 	stringsData = strings.Split(string(fContent), "\n")
@@ -311,6 +320,9 @@ func GetDataBilling(chBilling chan BillingData, chError chan error) {
 		errorLog.Println(err)
 		chError <- err
 		chBilling <- Billing
+	} else {
+		chError <- nil
+		log.Println("Billing")
 	}
 
 	for i, b := range fContent {
@@ -477,8 +489,9 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	var chVoice = make(chan []VoiceCallData)
 	var chEmail = make(chan []EmailData)
 	var chBilling = make(chan BillingData)
-	var chError = make(chan error)
+	var chError = make(chan error, 3)
 	result.Status = true
+
 	go GetDataSms(chSms, chError)
 
 	resultMms, err := GetMms()
@@ -506,11 +519,16 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("resultIncident", resultIncident)
 
-	err = <-chError
-	if err != nil {
-		result.Status = false
-		result.Error = "Error on collect data"
+	//err = <-chError
+	/*//////////////////////////
+	for err := range chError {
+		fmt.Println("ERROR", err)
+		if err != nil {
+			result.Status = false
+			result.Error = "Error on collect data"
+		}
 	}
+	*/ ///////////////////
 	resultSms := <-chSms
 	log.Println("resultSms", resultSms)
 
@@ -531,12 +549,27 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 		result.Data = resultData
 	}
 
+	for err := range chError {
+		log.Println("ERROR", err)
+		if err != nil {
+			result.Status = false
+			result.Error = "Error on collect data"
+		}
+	}
+	log.Println("range ch")
+	/////////////////////
+	close(chError)
+	////////////
+	log.Println("close ch")
+
 	dResultT, err := json.Marshal(result)
 	if err != nil {
 		errorLog.Fatal(err)
 	}
+	log.Println("json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(dResultT)
+	log.Println("FINISH")
 }
 
 func GetResultData(sms []SMSData, mms []MMSData, VoiceCall []VoiceCallData, resultEmail []EmailData, resultBilling BillingData, resultSupport []SupportData, Incidents []IncidentData) ResultSetT {
