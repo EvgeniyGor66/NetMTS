@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -121,18 +122,19 @@ func GetDataSms(chSms chan []SMSData, chError chan error) {
 		chSms <- finalSmsData
 	} else {
 		chError <- nil
-		log.Println("Sms")
 	}
 
 	stringsData = strings.Split(string(fContent), "\n")
-
+Loop:
 	for _, stringData := range stringsData { //разбиваем построчно
 		str := strings.Split(stringData, ";")
 		if len(str) != 4 {
 			continue
 		}
-		correctData := validation(str)
-
+		correctData, err := validation(str)
+		if err != nil {
+			break Loop
+		}
 		smsData.Country = correctData[0]
 		smsData.Bandwidth = correctData[1]
 		smsData.ResponseTime = correctData[2]
@@ -213,7 +215,6 @@ func GetDataVoiceCall(chVoice chan []VoiceCallData, chError chan error) {
 		chVoice <- finalVoiceCallData
 	} else {
 		chError <- nil
-		log.Println("Voice")
 	}
 
 	stringsData = strings.Split(string(fContent), "\n")
@@ -223,7 +224,10 @@ func GetDataVoiceCall(chVoice chan []VoiceCallData, chError chan error) {
 		if len(str) != 8 {
 			continue
 		}
-		correctData := validation(str)
+		correctData, err := validation(str)
+		if err != nil {
+			continue
+		}
 		VoiceCallData.Country = correctData[0]
 		VoiceCallData.Bandwidth = correctData[1]
 		VoiceCallData.ResponseTime = correctData[2]
@@ -252,7 +256,6 @@ func GetDataEmail(chEmail chan []EmailData, chError chan error) {
 		chEmail <- finalEmailData
 	} else {
 		chError <- nil
-		log.Println("Email")
 	}
 
 	stringsData = strings.Split(string(fContent), "\n")
@@ -322,7 +325,6 @@ func GetDataBilling(chBilling chan BillingData, chError chan error) {
 		chBilling <- Billing
 	} else {
 		chError <- nil
-		log.Println("Billing")
 	}
 
 	for i, b := range fContent {
@@ -395,16 +397,18 @@ func GetIncident(c IncidentData) ([]IncidentData, error) {
 	return Incident, nil
 }
 
-func validation(s []string) []string {
+func validation(s []string) ([]string, error) {
 	var correctData = make([]string, 8)
+	var Error error
 	for index, field := range s { //разбиваем строки по полям
+
 		switch index {
 		case 0: //проверка первого поля "код страны"
 			{
 				countryCode := string(field)
 				_, ok := checkCountry(countryCode)
 				if !ok {
-					break
+					return correctData, errors.New("bad countryCode")
 				} else {
 					correctData[0] = field
 				}
@@ -413,7 +417,7 @@ func validation(s []string) []string {
 			{
 				bandwidth, _ := strconv.Atoi(field)
 				if bandwidth > 100 || bandwidth < 0 {
-					break
+					return correctData, errors.New("bad bandwidth")
 				} else {
 					correctData[1] = field
 				}
@@ -424,7 +428,7 @@ func validation(s []string) []string {
 				if time > 0 {
 					correctData[2] = field
 				} else {
-					break
+					return correctData, errors.New("bad time")
 				}
 			}
 
@@ -432,7 +436,7 @@ func validation(s []string) []string {
 			{
 				provider := string(field)
 				if provider != prov1 && provider != prov2 && provider != prov3 && provider != prov4 && provider != prov5 && provider != prov6 {
-					break
+					return correctData, errors.New("bad provider")
 				} else {
 					correctData[3] = field
 				}
@@ -443,7 +447,7 @@ func validation(s []string) []string {
 				if ConnectionStability > 0 {
 					correctData[4] = field
 				} else {
-					break
+					return correctData, errors.New("bad ConnectionStability")
 				}
 			}
 		case 5:
@@ -452,7 +456,7 @@ func validation(s []string) []string {
 				if TTFB > 0 {
 					correctData[5] = field
 				} else {
-					break
+					return correctData, errors.New("bad TTFB")
 				}
 			}
 		case 6:
@@ -461,7 +465,7 @@ func validation(s []string) []string {
 				if VoicePurity > 0 {
 					correctData[6] = field
 				} else {
-					break
+					return correctData, errors.New("bad VoicePurity")
 				}
 			}
 		case 7:
@@ -470,13 +474,13 @@ func validation(s []string) []string {
 				if MedianOfCallsTime > 0 {
 					correctData[7] = field
 				} else {
-					break
+					return correctData, errors.New("bad MedianOfCallsTime")
 				}
 			}
 		}
 
 	}
-	return correctData
+	return correctData, Error
 }
 
 func HandleConnection(w http.ResponseWriter, r *http.Request) {
@@ -489,8 +493,9 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	var chVoice = make(chan []VoiceCallData)
 	var chEmail = make(chan []EmailData)
 	var chBilling = make(chan BillingData)
-	var chError = make(chan error, 3)
+	var chError = make(chan error, 4)
 	result.Status = true
+	numErr := 0
 
 	go GetDataSms(chSms, chError)
 
@@ -501,9 +506,9 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("resultMms: %s \n", resultMms)
 
-	go GetDataVoiceCall(chVoice, chError)
 	go GetDataEmail(chEmail, chError)
 	go GetDataBilling(chBilling, chError)
+	go GetDataVoiceCall(chVoice, chError)
 
 	resultSupport, err := GetSupport(SupportData)
 	if err != nil {
@@ -519,16 +524,6 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("resultIncident", resultIncident)
 
-	//err = <-chError
-	/*//////////////////////////
-	for err := range chError {
-		fmt.Println("ERROR", err)
-		if err != nil {
-			result.Status = false
-			result.Error = "Error on collect data"
-		}
-	}
-	*/ ///////////////////
 	resultSms := <-chSms
 	log.Println("resultSms", resultSms)
 
@@ -550,26 +545,23 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for err := range chError {
-		log.Println("ERROR", err)
 		if err != nil {
 			result.Status = false
 			result.Error = "Error on collect data"
 		}
+		numErr++
+		// Закрываем канал с ошибками после чтения последней ошибки из него
+		if numErr == 4 {
+			close(chError)
+		}
 	}
-	log.Println("range ch")
-	/////////////////////
-	close(chError)
-	////////////
-	log.Println("close ch")
 
 	dResultT, err := json.Marshal(result)
 	if err != nil {
 		errorLog.Fatal(err)
 	}
-	log.Println("json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(dResultT)
-	log.Println("FINISH")
 }
 
 func GetResultData(sms []SMSData, mms []MMSData, VoiceCall []VoiceCallData, resultEmail []EmailData, resultBilling BillingData, resultSupport []SupportData, Incidents []IncidentData) ResultSetT {
