@@ -560,6 +560,8 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errorLog.Fatal(err)
 	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.WriteHeader(http.StatusOK)
 	w.Write(dResultT)
 }
